@@ -125,7 +125,10 @@ export function initMemorySchema(): void {
 let embedder: unknown = null;
 
 async function getEmbedder(): Promise<
-  (text: string, opts: { pooling: string; normalize: boolean }) => Promise<{ data: Float32Array }>
+  (
+    text: string,
+    opts: { pooling: string; normalize: boolean },
+  ) => Promise<{ data: Float32Array }>
 > {
   if (!embedder) {
     const { pipeline } = await import('@huggingface/transformers');
@@ -169,7 +172,15 @@ export function addCoreMemory(
   db.prepare(
     `INSERT INTO core_memories (id, group_folder, category, content, metadata, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, groupFolder, category, content, metadata ? JSON.stringify(metadata) : null, ts, ts);
+  ).run(
+    id,
+    groupFolder,
+    category,
+    content,
+    metadata ? JSON.stringify(metadata) : null,
+    ts,
+    ts,
+  );
   return id;
 }
 
@@ -183,7 +194,9 @@ export async function addCoreMemoryWithEmbedding(
   try {
     const vec = await embed(content);
     getDb()
-      .prepare(`INSERT INTO core_memories_vec (memory_id, embedding) VALUES (?, ?)`)
+      .prepare(
+        `INSERT INTO core_memories_vec (memory_id, embedding) VALUES (?, ?)`,
+      )
       .run(id, Buffer.from(vec.buffer));
   } catch (err) {
     logger.warn({ err, id }, 'Failed to embed core memory');
@@ -193,24 +206,24 @@ export async function addCoreMemoryWithEmbedding(
 
 export function updateCoreMemory(id: string, content: string): void {
   const db = getDb();
-  db.prepare(`UPDATE core_memories SET content = ?, updated_at = ? WHERE id = ?`).run(
-    content,
-    now(),
-    id,
-  );
+  db.prepare(
+    `UPDATE core_memories SET content = ?, updated_at = ? WHERE id = ?`,
+  ).run(content, now(), id);
 }
 
-export async function updateCoreMemoryWithEmbedding(id: string, content: string): Promise<void> {
+export async function updateCoreMemoryWithEmbedding(
+  id: string,
+  content: string,
+): Promise<void> {
   updateCoreMemory(id, content);
   try {
     const vec = await embed(content);
     const db = getDb();
     // Delete old embedding and insert new one
     db.prepare(`DELETE FROM core_memories_vec WHERE memory_id = ?`).run(id);
-    db.prepare(`INSERT INTO core_memories_vec (memory_id, embedding) VALUES (?, ?)`).run(
-      id,
-      Buffer.from(vec.buffer),
-    );
+    db.prepare(
+      `INSERT INTO core_memories_vec (memory_id, embedding) VALUES (?, ?)`,
+    ).run(id, Buffer.from(vec.buffer));
   } catch (err) {
     logger.warn({ err, id }, 'Failed to re-embed core memory');
   }
@@ -226,21 +239,30 @@ export function removeCoreMemory(id: string): void {
   }
 }
 
-export function getCoreMemories(groupFolder: string, category?: string): CoreMemory[] {
+export function getCoreMemories(
+  groupFolder: string,
+  category?: string,
+): CoreMemory[] {
   const db = getDb();
   if (category) {
     return db
-      .prepare(`SELECT * FROM core_memories WHERE group_folder = ? AND category = ? ORDER BY updated_at DESC`)
+      .prepare(
+        `SELECT * FROM core_memories WHERE group_folder = ? AND category = ? ORDER BY updated_at DESC`,
+      )
       .all(groupFolder, category) as CoreMemory[];
   }
   return db
-    .prepare(`SELECT * FROM core_memories WHERE group_folder = ? ORDER BY updated_at DESC`)
+    .prepare(
+      `SELECT * FROM core_memories WHERE group_folder = ? ORDER BY updated_at DESC`,
+    )
     .all(groupFolder) as CoreMemory[];
 }
 
 export function getPinnedMemories(groupFolder: string): CoreMemory[] {
   return getDb()
-    .prepare(`SELECT * FROM core_memories WHERE group_folder = ? AND is_pinned = 1 ORDER BY updated_at DESC`)
+    .prepare(
+      `SELECT * FROM core_memories WHERE group_folder = ? AND is_pinned = 1 ORDER BY updated_at DESC`,
+    )
     .all(groupFolder) as CoreMemory[];
 }
 
@@ -260,7 +282,10 @@ export async function searchCoreMemories(
        WHERE embedding MATCH ? AND k = ?
        ORDER BY distance`,
     )
-    .all(Buffer.from(vec.buffer), limit * 2) as Array<{ memory_id: string; distance: number }>;
+    .all(Buffer.from(vec.buffer), limit * 2) as Array<{
+    memory_id: string;
+    distance: number;
+  }>;
 
   if (vecResults.length === 0) return [];
 
@@ -302,8 +327,7 @@ export async function embedMessage(
       ? `${contextParts.join('\n')}\n${message.sender_name}: ${message.content}`
       : `${message.sender_name}: ${message.content}`;
 
-  const contextStr =
-    contextParts.length > 0 ? contextParts.join('\n') : null;
+  const contextStr = contextParts.length > 0 ? contextParts.join('\n') : null;
 
   db.prepare(
     `INSERT INTO conversation_chunks (id, group_folder, chat_jid, message_id, content, context, sender_name, timestamp, created_at)
@@ -321,10 +345,9 @@ export async function embedMessage(
   );
 
   const vec = await embed(embeddingText);
-  db.prepare(`INSERT INTO conversation_chunks_vec (chunk_id, embedding) VALUES (?, ?)`).run(
-    id,
-    Buffer.from(vec.buffer),
-  );
+  db.prepare(
+    `INSERT INTO conversation_chunks_vec (chunk_id, embedding) VALUES (?, ?)`,
+  ).run(id, Buffer.from(vec.buffer));
 }
 
 export async function embedConversationMessages(
@@ -362,7 +385,10 @@ export async function retrieveRelevantChunks(
        WHERE embedding MATCH ? AND k = ?
        ORDER BY distance`,
     )
-    .all(Buffer.from(vec.buffer), limit * 2) as Array<{ chunk_id: string; distance: number }>;
+    .all(Buffer.from(vec.buffer), limit * 2) as Array<{
+    chunk_id: string;
+    distance: number;
+  }>;
 
   if (vecResults.length === 0) return [];
 
@@ -397,14 +423,22 @@ export async function archiveSession(
   db.prepare(
     `INSERT INTO archival_memories (id, group_folder, session_id, title, content, timestamp, message_count, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, groupFolder, sessionId, title, content, ts, messageCount ?? null, ts);
+  ).run(
+    id,
+    groupFolder,
+    sessionId,
+    title,
+    content,
+    ts,
+    messageCount ?? null,
+    ts,
+  );
 
   try {
     const vec = await embed(content.slice(0, 1000)); // Embed first 1000 chars of summary
-    db.prepare(`INSERT INTO archival_memories_vec (memory_id, embedding) VALUES (?, ?)`).run(
-      id,
-      Buffer.from(vec.buffer),
-    );
+    db.prepare(
+      `INSERT INTO archival_memories_vec (memory_id, embedding) VALUES (?, ?)`,
+    ).run(id, Buffer.from(vec.buffer));
   } catch (err) {
     logger.warn({ err, id }, 'Failed to embed archival memory');
   }
@@ -427,7 +461,10 @@ export async function searchArchive(
        WHERE embedding MATCH ? AND k = ?
        ORDER BY distance`,
     )
-    .all(Buffer.from(vec.buffer), limit * 2) as Array<{ memory_id: string; distance: number }>;
+    .all(Buffer.from(vec.buffer), limit * 2) as Array<{
+    memory_id: string;
+    distance: number;
+  }>;
 
   if (vecResults.length === 0) return [];
 
@@ -528,9 +565,15 @@ export async function retrieveMemoryContext(
  * Build memory snapshot for the agent (written to IPC dir).
  * Agent uses this to see existing memory IDs for update/remove operations.
  */
-export function buildMemorySnapshot(
-  groupFolder: string,
-): { coreMemories: Array<{ id: string; category: string; content: string; is_pinned: boolean; updated_at: string }> } {
+export function buildMemorySnapshot(groupFolder: string): {
+  coreMemories: Array<{
+    id: string;
+    category: string;
+    content: string;
+    is_pinned: boolean;
+    updated_at: string;
+  }>;
+} {
   const memories = getCoreMemories(groupFolder);
   return {
     coreMemories: memories.map((m) => ({
@@ -571,7 +614,11 @@ export async function searchAllMemory(
 
   if (scope === 'all' || scope === 'conversations') {
     try {
-      const convResults = await retrieveRelevantChunks(groupFolder, query, limit);
+      const convResults = await retrieveRelevantChunks(
+        groupFolder,
+        query,
+        limit,
+      );
       if (convResults.length > 0) {
         results.push('## Past Conversations');
         for (const c of convResults) {
@@ -587,7 +634,9 @@ export async function searchAllMemory(
       if (archiveResults.length > 0) {
         results.push('## Session Archives');
         for (const a of archiveResults) {
-          results.push(`- [${a.timestamp}] ${a.title || 'Untitled session'}: ${a.content.slice(0, 200)}...`);
+          results.push(
+            `- [${a.timestamp}] ${a.title || 'Untitled session'}: ${a.content.slice(0, 200)}...`,
+          );
         }
       }
     } catch {
@@ -595,5 +644,7 @@ export async function searchAllMemory(
     }
   }
 
-  return results.length > 0 ? results.join('\n') : 'No relevant memories found.';
+  return results.length > 0
+    ? results.join('\n')
+    : 'No relevant memories found.';
 }

@@ -171,7 +171,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   try {
     memoryContext = await retrieveMemoryContext(group.folder, missedMessages);
   } catch (err) {
-    logger.warn({ group: group.name, err }, 'Memory retrieval failed, continuing without');
+    logger.warn(
+      { group: group.name, err },
+      'Memory retrieval failed, continuing without',
+    );
   }
 
   const prompt = memoryContext + formatMessages(missedMessages);
@@ -205,6 +208,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   await channel.setTyping?.(chatJid, true);
   let hadError = false;
   let outputSentToUser = false;
+  let messagesEmbedded = false;
 
   const output = await runAgent(group, prompt, chatJid, async (result) => {
     // Streaming output callback — called for each agent result
@@ -222,6 +226,21 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       }
       // Only reset idle timer on actual results, not session-update markers (result: null)
       resetIdleTimer();
+
+      // Embed conversation messages on first successful output (don't wait for container exit)
+      if (!messagesEmbedded) {
+        messagesEmbedded = true;
+        embedConversationMessages(
+          group.folder,
+          chatJid,
+          missedMessages,
+        ).catch((err) =>
+          logger.warn(
+            { group: group.name, err },
+            'Failed to embed conversation messages',
+          ),
+        );
+      }
     }
 
     if (result.status === 'success') {
@@ -235,13 +254,6 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
-
-  // Embed conversation messages for future RAG retrieval (async, non-blocking)
-  if (output !== 'error' && !hadError) {
-    embedConversationMessages(group.folder, chatJid, missedMessages).catch(
-      (err) => logger.warn({ group: group.name, err }, 'Failed to embed conversation messages'),
-    );
-  }
 
   if (output === 'error' || hadError) {
     // If we already sent output to the user, don't roll back the cursor —

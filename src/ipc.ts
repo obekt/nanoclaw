@@ -156,7 +156,7 @@ export function startIpcWatcher(deps: IpcDeps): void {
         if (fs.existsSync(memoryDir)) {
           const memoryFiles = fs
             .readdirSync(memoryDir)
-            .filter((f) => f.startsWith('req-') && f.endsWith('.json'));
+            .filter((f) => f.endsWith('.json') && !f.startsWith('res-'));
           for (const file of memoryFiles) {
             const filePath = path.join(memoryDir, file);
             try {
@@ -168,12 +168,19 @@ export function startIpcWatcher(deps: IpcDeps): void {
                 { file, sourceGroup, err },
                 'Error processing IPC memory request',
               );
-              try { fs.unlinkSync(path.join(memoryDir, file)); } catch { /* ignore */ }
+              try {
+                fs.unlinkSync(path.join(memoryDir, file));
+              } catch {
+                /* ignore */
+              }
             }
           }
         }
       } catch (err) {
-        logger.error({ err, sourceGroup }, 'Error reading IPC memory directory');
+        logger.error(
+          { err, sourceGroup },
+          'Error reading IPC memory directory',
+        );
       }
     }
 
@@ -486,7 +493,8 @@ async function processMemoryIpc(
     case 'memory_search':
       if (data.query && data.requestId) {
         try {
-          const scope = (data.scope as 'all' | 'conversations' | 'facts') || 'all';
+          const scope =
+            (data.scope as 'all' | 'conversations' | 'facts') || 'all';
           const results = await searchAllMemory(
             groupFolder,
             data.query,

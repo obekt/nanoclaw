@@ -17,7 +17,8 @@ let db: Database.Database;
 
 /** Get the database instance. Must call initDatabase() first. */
 export function getDb(): Database.Database {
-  if (!db) throw new Error('Database not initialized — call initDatabase() first');
+  if (!db)
+    throw new Error('Database not initialized — call initDatabase() first');
   return db;
 }
 
